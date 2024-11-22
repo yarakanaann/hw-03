@@ -75,7 +75,6 @@ linear_reg() %>%
   set_engine("lm") %>%
   fit(emailhr ~ educ + fulltime, data = gss16_advfront) %>%
   tidy()
-
 ```
 
 On average, individuals who are employed full - time spend 5.2796 more hours per week on email than individuals who are not employed full-time, this is assuming that all else is held constant
@@ -85,16 +84,26 @@ On average, individuals who are employed full - time spend 5.2796 more hours per
 #### Exercise 1 (b)
 
 ```{r}
-model = linear_reg() %>%
-  set_engine("lm") %>%
-  fit(emailhr ~ educ + fulltime, data = gss16_advfront) %>%
-  tidy() 
-tidy_model <- tidy(model)
 
-print(tidy_model)
+
+model <- lm(emailhr ~ educ + fulltime, data = gss16_advfront)
+
+summary(model)
+glance(model) 
+
+# plotting residuals vs fitted values
+
+ggplot(data = model, aes(x = .fitted, y = .resid)) +
+  geom_point() +
+  labs(x = "fitted values", y = "residuals") +
+  ggtitle("residuals vs fitted values")
+
+
 ```
 
-*Your answer here*
+One of the assumptions of linear regression is that the variance of the residuals should be constant. To check this, I did a residuals vs fitted values plot. Once I plotted this, I saw a cone shaped pattern, suggesting that the variance is not constant, meaning the residuals spread increases as the fitted values increase  - this means the variance is not constant so, the assumption is incorrect and the model is invalid/ not reliable.
+
+The r squared value is very low (much closer to 0 than to 1), meaning that the model cannot validly be used to predict anything. this is because since the low r squared and adjusted r squared value is very low. This indicates a low correlation between the variables (educ and fulltime)
 
 ## Exercise 2: Create a workflow to fit a model
 
@@ -107,69 +116,174 @@ gss16_test  <- testing(gss16_split)
 
 #### Exercise 2 (a)
 
-```{r}
-# replace this with your code
+```{r create a recipe}
+
+gss16_rec_1 <- recipe(advfront ~ educ, data = gss16_train) %>%
+  step_dummy(all_nominal(), -all_outcomes()) 
+
+gss16_mod_1 <- logistic_reg() %>%
+  set_engine("glm")  
+
+
+# creating the workflow
+
+gss16_wflow_1 <- workflow() %>%
+  add_recipe(gss16_rec_1) %>%
+  add_model(gss16_mod_1)
+
 ```
 
-*Your answer here*
 
 #### Exercise 2 (b)
 
-```{r}
-# replace this with your code
-```
-
-*Your answer here*
+I picked a logistic regression because it models the probability of something happening, requiring the response variable to be binary - in this case the response variables are in agreement or not in agreement. Since logistic regression is designed for situations like these, I thought it would be the perfect model for this. 
 
 #### Exercise 2 (c)
 
 ```{r}
-# replace this with your code
+
+gss16_fit_1 <- gss16_wflow_1 %>%
+  fit(data = gss16_train)
+
+
+gss16_fit_1 %>%
+  extract_fit_parsnip() %>%
+  tidy() 
+
 ```
 
-*Your answer here*
+
 
 ## Exercise 3: Logistic regression with single predictor
 
 #### Exercise 3 (a)
 
 ```{r}
-# replace this with your code
+library(pROC)
+
+gss16_pred_1 <- predict(gss16_fit_1, new_data = gss16_test, type = "prob")
+
+true_values <- gss16_test$advfront
+
+roc_curve <- roc(true_values, gss16_pred_1$.pred_Agree)
+
+plot(roc_curve, main = "ROC curve", col = "blue")
+
+# area under curve:
+auc(roc_curve)
+
+ifelse(gss16_pred_1$.pred_Agree >= 0.85, "Agree", "Not agree")
+
+# this means is the predicted probability for agree is greater than or same as 0.85 than we predict agree. if it is less than 0.85 we predict not agree 
+
+
+
 ```
 
-*Your answer here*
 
 #### Exercise 3 (b)
 
 ```{r}
-# replace this with your code
-```
 
-*Your answer here*
+gss16_pred_binary <- ifelse(gss16_pred_1$.pred_Agree >= 0.85, "Agree", "Not agree")
+
+
+true_values <- gss16_test$advfront
+
+ # if actual value is agree and predicted value is agree than I assigned it YY
+ifelse(true_values == "Agree" & gss16_pred_binary == "Agree", "YY", 
+ # if actual value is agree and predicted value is not agree than I assigned it YN
+ifelse(true_values == "Agree" & gss16_pred_binary == "Not agree", "YN", 
+ # if actual value is not agree and predicted value is agree than I assigned it NY and NN
+ifelse(true_values == "Not agree" & gss16_pred_binary == "Agree", "NN", "NY")))
+
+YY <- sum(true_values == "Agree" & gss16_pred_binary == "Agree")
+YN <- sum(true_values == "Agree" & gss16_pred_binary == "Not agree")
+NN <- sum(true_values == "Not agree" & gss16_pred_binary == "Not agree")
+NY <- sum(true_values == "Not agree" & gss16_pred_binary == "Agree")
+
+# formula for sensititivity
+sensitivity <- YY / (YY + YN)
+
+# formula for specitivity
+specificity <- NN / (NN + NY)
+
+print(paste("Sensitivity: ", sensitivity))
+print(paste("Specificity: ", specificity))
+
+```
 
 ## Exercise 4: Logistic regression modelling and interpretation
 
 #### Exercise 4 (a)
 
 ```{r}
-# replace this with your code
-```
 
-*Your answer here*
+gss16_rec_2 <- recipe(advfront ~ polviews + wrkstat + educ, data = gss16_train) %>%
+  step_dummy(all_nominal(), -all_outcomes()) 
+
+gss16_mod_2 <- logistic_reg() %>%
+  set_engine("glm")
+
+# create the workflow
+gss16_wflow_2 <- workflow() %>%
+  add_recipe(gss16_rec_2) %>%
+  add_model(gss16_mod_2)
+
+
+# I will use logistic regression since we are predicting the advfront variable which is binary 
+
+
+```
 
 #### Exercise 4 (b)
   
 ```{r}
-# replace this with your code
+
+#repeating previous code because it was not working otherwise
+
+gss16_rec_2 <- recipe(advfront ~ polviews + wrkstat + educ, data = gss16_train) %>%
+  step_dummy(all_nominal(), -all_outcomes()) 
+
+gss16_mod_2 <- logistic_reg() %>%
+  set_engine("glm")
+
+# create the workflow
+gss16_wflow_2 <- workflow() %>%
+  add_recipe(gss16_rec_2) %>%
+  add_model(gss16_mod_2)
+
+#exercise answer
+
+gss16_fit_2 <- fit(gss16_wflow_2, data = gss16_train)
+
+gss16_preds <- predict(gss16_fit_2, new_data = gss16_test, type = "prob")
+
+roc_curve <- roc(gss16_test$advfront, gss16_preds$.pred_Agree)
+
+plot(roc_curve, main = "ROC Curve for gss16_fit_2", col = "blue")
+
+auc(roc_curve)
+
+
+
 ```
 
-*Your answer here*
+
 
 #### Exercise 4 (c) 
+AUC comparison: 
+AUC of mode 1: 0.5807
+AUC of model 2: 0.5391
+When AUC is closer to 1, the model shows strong ability to distinguish between classes therefore the better model based on the AUC value is model 1 because 0.5807>0.5391
 
-```{r}
-# replace this with your code
-```
+number of variables: 
+model 1 has less variables than model 2. More variables usually means it is better at distinguishing between the two classes since it is provided with more information. This, however, is not always the case, especially when it comes to adding irrelevant variables. In model 2, i would say adding political views and work status could provide more relevant information and could help determine between the two classes with more confidence. 
 
-*Your answer here*
+shape of the ROC curve: 
+When an ROC curve is closer to the top left corner of the graph, it is better at distinguishing between the two classes. Both of these curves are not very good in that aspect, so I couldn't validly compare them to each other. However model one is slightly more consistently above model 2 across the range of threshold values. This shows model 1 is relatively better. 
+
+In conclusion, model 1 is better at distinguishing between the two variables overall, considering what I took into account. However it is not a clear difference since they both are so similar and there is not a very obvious distinguishing factor that makes one better than the other (have similar shapes, AUC values...)
+
+
 
